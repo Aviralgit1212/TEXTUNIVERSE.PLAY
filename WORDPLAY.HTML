@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>TEXT → UNIVERSE</title>
+
+<style>
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    overflow: hidden;
+    background: #020205;
+    font-family: Arial, sans-serif;
+    color: white;
+}
+
+canvas {
+    display: block;
+}
+
+#ui {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#title {
+    position: absolute;
+    top: 30px;
+    left: 35px;
+    font-size: 11px;
+    letter-spacing: 5px;
+    opacity: .45;
+}
+
+#status {
+    position: absolute;
+    top: 30px;
+    right: 35px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    opacity: .4;
+}
+
+#hint {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    font-size: 10px;
+    letter-spacing: 2px;
+    opacity: .35;
+    line-height: 1.8;
+}
+
+#input {
+    position: absolute;
+    left: 50%;
+    bottom: 70px;
+    transform: translateX(-50%);
+
+    width: 500px;
+    max-width: 80vw;
+
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.15);
+    border-radius: 30px;
+
+    padding: 13px 22px;
+
+    color: white;
+    outline: none;
+
+    text-align: center;
+    font-size: 15px;
+    letter-spacing: 3px;
+
+    pointer-events: auto;
+
+    backdrop-filter: blur(10px);
+}
+
+#input::placeholder {
+    color: rgba(255,255,255,.35);
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="ui">
+
+    <div id="title">
+        TEXT → UNIVERSE
+    </div>
+
+    <div id="status">
+        PARTICLE ENGINE / ONLINE
+    </div>
+
+    <input
+        id="input"
+        placeholder="TYPE SOMETHING..."
+        maxlength="18"
+        value="AVIRAL"
+    >
+
+    <div id="hint">
+        DRAG = ROTATE &nbsp; • &nbsp;
+        SCROLL = ZOOM &nbsp; • &nbsp;
+        SPACE = EXPLODE &nbsp; • &nbsp;
+        R = RESET
+    </div>
+
+</div>
+
+
+<script type="module">
+
+import * as THREE from
+"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
+
+
+// =====================================================
+// SCENE
+// =====================================================
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(
+    60,
+    innerWidth / innerHeight,
+    0.1,
+    3000
+);
+
+camera.position.z = 500;
+
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true,
+    alpha: true
+});
+
+renderer.setPixelRatio(
+    Math.min(devicePixelRatio, 2)
+);
+
+renderer.setSize(
+    innerWidth,
+    innerHeight
+);
+
+document.body.appendChild(
+    renderer.domElement
+);
+
+
+// =====================================================
+// PARTICLES
+// =====================================================
+
+const COUNT = 14000;
+
+const positions =
+    new Float32Array(COUNT * 3);
+
+const targets =
+    new Float32Array(COUNT * 3);
+
+const velocities =
+    new Float32Array(COUNT * 3);
+
+const random =
+    new Float32Array(COUNT * 3);
+
+
+for (let i = 0; i < COUNT; i++) {
+
+    const i3 = i * 3;
+
+    const radius =
+        300 + Math.random() * 500;
+
+    const angle =
+        Math.random() * Math.PI * 2;
+
+    positions[i3] =
+        Math.cos(angle) * radius;
+
+    positions[i3 + 1] =
+        Math.sin(angle) * radius;
+
+    positions[i3 + 2] =
+        (Math.random() - .5) * 700;
+
+
+    targets[i3] =
+        positions[i3];
+
+    targets[i3 + 1] =
+        positions[i3 + 1];
+
+    targets[i3 + 2] =
+        positions[i3 + 2];
+
+
+    random[i3] =
+        Math.random();
+
+    random[i3 + 1] =
+        Math.random();
+
+    random[i3 + 2] =
+        Math.random();
+}
+
+
+const geometry =
+    new THREE.BufferGeometry();
+
+geometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(
+        positions,
+        3
+    )
+);
+
+
+const material =
+    new THREE.PointsMaterial({
+
+        color: 0xffffff,
+
+        size: 2.1,
+
+        transparent: true,
+
+        opacity: .9,
+
+        blending:
+            THREE.AdditiveBlending,
+
+        depthWrite: false
+
+    });
+
+
+const particles =
+    new THREE.Points(
+        geometry,
+        material
+    );
+
+
+scene.add(particles);
+
+
+// =====================================================
+// TEXT → PARTICLES
+// =====================================================
+
+const textCanvas =
+    document.createElement("canvas");
+
+const ctx =
+    textCanvas.getContext("2d");
+
+textCanvas.width = 1200;
+textCanvas.height = 350;
+
+
+function createTextTargets(text) {
+
+    ctx.clearRect(
+        0,
+        0,
+        textCanvas.width,
+        textCanvas.height
+    );
+
+
+    ctx.fillStyle = "white";
+
+    ctx.font =
+        "900 170px Arial";
+
+    ctx.textAlign =
+        "center";
+
+    ctx.textBaseline =
+        "middle";
+
+
+    ctx.fillText(
+        text || "TYPE",
+        600,
+        175
+    );
+
+
+    const image =
+        ctx.getImageData(
+            0,
+            0,
+            textCanvas.width,
+            textCanvas.height
+        ).data;
+
+
+    const points = [];
+
+
+    for (
+        let y = 0;
+        y < textCanvas.height;
+        y += 4
+    ) {
+
+        for (
+            let x = 0;
+            x < textCanvas.width;
+            x += 4
+        ) {
+
+            const index =
+                (y * textCanvas.width + x) * 4;
+
+
+            if (
+                image[index + 3] > 100
+            ) {
+
+                points.push({
+                    x: x - 600,
+                    y: 175 - y
+                });
+
+            }
+
+        }
+
+    }
+
+
+    for (
+        let i = 0;
+        i < COUNT;
+        i++
+    ) {
+
+        const i3 = i * 3;
+
+        const p =
+            points[
+                i % points.length
+            ];
+
+
+        targets[i3] =
+            p.x * 1.15;
+
+        targets[i3 + 1] =
+            p.y * 1.15;
+
+        targets[i3 + 2] =
+            (Math.random() - .5) * 30;
+
+    }
+
+}
+
+
+// =====================================================
+// INPUT
+// =====================================================
+
+const input =
+    document.getElementById("input");
+
+
+createTextTargets(
+    input.value
+);
+
+
+input.addEventListener(
+    "input",
+    () => {
+
+        createTextTargets(
+            input.value
+        );
+
+    }
+);
+
+
+// =====================================================
+// EXPLOSION
+// =====================================================
+
+function explode() {
+
+    for (
+        let i = 0;
+        i < COUNT;
+        i++
+    ) {
+
+        const i3 = i * 3;
+
+
+        const x =
+            positions[i3];
+
+        const y =
+            positions[i3 + 1];
+
+        const z =
+            positions[i3 + 2];
+
+
+        const distance =
+            Math.sqrt(
+                x*x +
+                y*y +
+                z*z
+            ) || 1;
+
+
+        const power =
+            8 +
+            Math.random() * 18;
+
+
+        velocities[i3] =
+            (x / distance) * power;
+
+        velocities[i3 + 1] =
+            (y / distance) * power;
+
+        velocities[i3 + 2] =
+            (z / distance) * power;
+
+    }
+
+}
+
+
+document.addEventListener(
+    "keydown",
+    e => {
+
+        if (
+            e.code === "Space" &&
+            document.activeElement !== input
+        ) {
+
+            e.preventDefault();
+
+            explode();
+
+        }
+
+
+        if (
+            e.key.toLowerCase() === "r"
+        ) {
+
+            particles.rotation.x = 0;
+            particles.rotation.y = 0;
+            particles.rotation.z = 0;
+
+            rotationX = 0;
+            rotationY = 0;
+
+        }
+
+
+        if (
+            e.key === "Enter"
+        ) {
+
+            createTextTargets(
+                input.value
+            );
+
+        }
+
+    }
+);
+
+
+// =====================================================
+// 3D DRAG ROTATION
+// =====================================================
+
+let dragging = false;
+
+let previousX = 0;
+let previousY = 0;
+
+
+let rotationX = 0;
+let rotationY = 0;
+
+
+let velocityX = 0;
+let velocityY = 0;
+
+
+renderer.domElement.addEventListener(
+    "pointerdown",
+    e => {
+
+        dragging = true;
+
+        previousX = e.clientX;
+        previousY = e.clientY;
+
+        renderer.domElement.setPointerCapture(
+            e.pointerId
+        );
+
+    }
+);
+
+
+renderer.domElement.addEventListener(
+    "pointermove",
+    e => {
+
+        if (!dragging)
+            return;
+
+
+        const dx =
+            e.clientX - previousX;
+
+        const dy =
+            e.clientY - previousY;
+
+
+        rotationY +=
+            dx * 0.008;
+
+        rotationX +=
+            dy * 0.008;
+
+
+        velocityY =
+            dx * 0.008;
+
+        velocityX =
+            dy * 0.008;
+
+
+        previousX =
+            e.clientX;
+
+        previousY =
+            e.clientY;
+
+    }
+);
+
+
+renderer.domElement.addEventListener(
+    "pointerup",
+    e => {
+
+        dragging = false;
+
+    }
+);
+
+
+renderer.domElement.addEventListener(
+    "pointercancel",
+    () => {
+
+        dragging = false;
+
+    }
+);
+
+
+// =====================================================
+// ZOOM
+// =====================================================
+
+window.addEventListener(
+    "wheel",
+    e => {
+
+        camera.position.z +=
+            e.deltaY * 0.5;
+
+
+        camera.position.z =
+            THREE.MathUtils.clamp(
+                camera.position.z,
+                180,
+                1000
+            );
+
+    }
+);
+
+
+// =====================================================
+// ANIMATION
+// =====================================================
+
+const clock =
+    new THREE.Clock();
+
+
+function animate() {
+
+    requestAnimationFrame(
+        animate
+    );
+
+
+    const time =
+        clock.getElapsedTime();
+
+
+    // ---------------------------------------------
+    // PARTICLES
+    // ---------------------------------------------
+
+    for (
+        let i = 0;
+        i < COUNT;
+        i++
+    ) {
+
+        const i3 = i * 3;
+
+
+        const dx =
+            targets[i3] -
+            positions[i3];
+
+        const dy =
+            targets[i3 + 1] -
+            positions[i3 + 1];
+
+        const dz =
+            targets[i3 + 2] -
+            positions[i3 + 2];
+
+
+        // Smooth morph
+        positions[i3] +=
+            dx * 0.045;
+
+        positions[i3 + 1] +=
+            dy * 0.045;
+
+        positions[i3 + 2] +=
+            dz * 0.045;
+
+
+        // Floating
+        positions[i3] +=
+            Math.sin(
+                time +
+                random[i3] * 20
+            ) * 0.02;
+
+        positions[i3 + 1] +=
+            Math.cos(
+                time +
+                random[i3 + 1] * 20
+            ) * 0.02;
+
+
+        // Explosion
+        positions[i3] +=
+            velocities[i3];
+
+        positions[i3 + 1] +=
+            velocities[i3 + 1];
+
+        positions[i3 + 2] +=
+            velocities[i3 + 2];
+
+
+        velocities[i3] *= .94;
+        velocities[i3 + 1] *= .94;
+        velocities[i3 + 2] *= .94;
+
+    }
+
+
+    geometry.attributes
+        .position
+        .needsUpdate = true;
+
+
+    // =================================================
+    // ROTATION
+    // =================================================
+
+    if (!dragging) {
+
+        // Momentum
+        rotationY +=
+            velocityY;
+
+        rotationX +=
+            velocityX;
+
+
+        // Friction
+        velocityX *= .94;
+        velocityY *= .94;
+
+
+        // Tiny automatic rotation
+        rotationY +=
+            0.001;
+
+    }
+
+
+    particles.rotation.x =
+        rotationX;
+
+    particles.rotation.y =
+        rotationY;
+
+
+    // =================================================
+    // CAMERA
+    // =================================================
+
+    camera.lookAt(
+        0,
+        0,
+        0
+    );
+
+
+    renderer.render(
+        scene,
+        camera
+    );
+
+}
+
+
+animate();
+
+
+// =====================================================
+// RESIZE
+// =====================================================
+
+window.addEventListener(
+    "resize",
+    () => {
+
+        camera.aspect =
+            innerWidth /
+            innerHeight;
+
+        camera.updateProjectionMatrix();
+
+
+        renderer.setSize(
+            innerWidth,
+            innerHeight
+        );
+
+    }
+);
+
+</script>
+
+</body>
+</html>
